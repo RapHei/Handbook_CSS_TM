@@ -13,6 +13,7 @@ Working with text poses important conceptual and methodological challenges. Topi
 ## Code
 Due to legal reasons, the repository cannot include any data from ProQuest. The raw text data is available under [ProQuest](https://www.proquest.com/).
 
-Nevertheless, we provide the code necessary to reconstruct everything we have done, and, apply it to own use cases. The code contains X scripts:
+Nevertheless, we provide the code necessary to reconstruct everything we have done, and, apply it to own use cases. The code contains 2 scripts:
 
-* 
+* `Handbook_Preprocessing.R`: applies 12 different preprocessing steps as discussed in the chapter and shows how to run the respective STMs
+* `Handbook_Analyze_K.R`: derives the figures presented in the chapter
