@@ -1,6 +1,6 @@
 # Handbook_CSS_TM
 
-This repository contains code and data to reproduce our contribution to the *Handbook of Computational Social Science* on **Text Mining and Topic Modeling**.
+This repository contains code and data to reproduce our contribution to the *Handbook of Computational Social Science* on [Text Mining and Topic Modeling](https://www.taylorfrancis.com/chapters/edit/10.4324/9781003025245-24/text-mining-topic-modeling-raphael-heiberger-sebastian-munoz-najar-galvez?context=ubx&refId=a1727d76-7a53-4475-9e19-c368d84e864d).
 
 If you use any of the code or ideas presented here, please cite the paper as follows:
 
