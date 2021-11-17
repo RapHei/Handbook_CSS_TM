@@ -1,0 +1,225 @@
+# Preprocessing
+
+# The script entails three steps: 
+# * **1)** general preprocessing applied to all texts (e.g., fix whitespaces, remove numbers etc)
+# * **2)** specific preprocessing steps as discussed in the chapter: 
+#   * Stems vs. Lemmas vs. No reduction
+#   * Default vs. Extended stopwords
+#   * Bigrams vs. Trigrams
+# * **3)** create input that can be read by the STM-package (this step could also be included in (2))
+
+
+# General preprocessing
+prepro_general <- function(input.chars){
+  input.chars <- trimws(input.chars,
+                        which = "both")
+  toks <- quanteda::tokens(char_tolower(input.chars),
+                           remove_numbers = TRUE,
+                           remove_punct = TRUE,
+                           remove_punct = TRUE, 
+                           remove_symbols = TRUE,
+                           remove_url = TRUE)
+  toks <- quanteda::tokens_remove(toks, "^[[:alpha:]]$",valuetype="regex") #one letter
+  toks <- quanteda::tokens_remove(toks, "^[[:alpha:]]{1}\\.{1}$",valuetype="regex") #letter .
+  input.chars <- sapply(toks, paste, collapse = ' ')
+  return(input.chars)
+}
+
+# * The input comprises the title and abstract of each thesis. `ThesisTitle` and `ThesisAbstract` represent those specific columns and are combined to `for_stm`. However, the function `prepro_general` can work with any vector of characters. 
+# * For instance, the following line should produce the main input df
+
+input <- paste(df$ThesisTitle,
+                     df$ThesisAbstract)
+df$for_stm <- prepro_general(input.chars = input)
+
+
+# Specific preprocessing
+
+### Settings 
+
+#### Default stopwords
+sw.def <- quanteda::stopwords("en") 
+sw.def <- sw.def[- grep("'", sw.def)] # drops all words with ' (eg "i'm", "you're", etc) # N = 125
+
+#### Extended stopwords
+months <- c("january","february","march","april",
+            "may","june","july","august","september",
+            "october","november","december", "month",
+            "year", "day", "minute", "hour", "second")
+numerals <- c("one","two","three","four","five",
+              "six","seven","eight","nine",
+              "first", "second", "third", "fourth",
+              "fifth", "sixth", "seventh", "eigth",
+              "ninth", "tenth", "tenth", "eleventh", "twelfth", "nineteenth")
+misc <- c("within", "however", "also",
+          "achieve", "examine", "outcome", "associate", "indicate", "also", "whether", "variable", "consider", "although", "west", "valley", "article", "copyright", "study", "their","because","themselves", "there", "non","null", "introduct", "vol", "review", "publish", "journal", "develop", "project", "argument", "aspect", "much", "come", "look", "print", "dissertation", "who", "which", "can", "have", "than", "how", "show", "from", "paper", "explore", "paper","essay", "research", "between", "need", "use", "null", "century", "chapter", "elsevier", "inc", "ltd", "wiley", "right")
+sw.ext <- c(sw.def, months, numerals, misc) # length(unique(sw.ext)) # N = 212
+
+#### Maximum number of ngrams 
+ngrams.max <- 7000 # assuming 5% of number of documents; still, arbitrary choice
+
+
+### Loop over specific preprocessing steps
+
+# * small function to do parallel
+library(doParallel)
+parallelizeTask <- function(task,...) {
+  # Calculate the number of cores
+  # ncores <- detectCores() - 1
+  ncores <- 12 # on server
+  # Initiate cluster
+  cl <- makeCluster(ncores)
+  registerDoParallel(cl)
+  #print("Starting task")
+  r <- task(...)
+  #print("Task done")
+  stopCluster(cl)
+  r
+}
+
+
+# We test three different settings and write each to a specific file. Those files are then used to run the STMs (see step 3). 
+# * Stems vs. Lemmas vs. No reduction
+stem.v <- c('port', 'lemm', 'none') # (1)
+# * Default vs. Extended stopwords
+stops.v <- c('def', 'ext') # (2)
+# * Bigrams vs. Trigrams
+ngrams.v <- c('bi', 'tri') # (3)
+
+
+toks.base <- quanteda::tokens(df$for_stm) # cf. "General preprocessing" above
+
+start.time <- Sys.time()
+for(s in stem.v){
+  ## Step (1)
+  if(s == 'port'){
+    toks <- quanteda::tokens_wordstem(toks.base) # Porter stemmer
+    sw.def <- textstem::stem_strings(sw.def)
+    sw.ext <- textstem::stem_strings(sw.ext)
+  }
+  if(s == 'lemm'){
+    toks <- lapply(toks.base, textstem::lemmatize_words) # Lemmatize
+    toks <- as.tokens(toks)
+    sw.def <- textstem::lemmatize_strings(sw.def)
+    sw.ext <- textstem::lemmatize_words(sw.ext)
+  }
+  if(s == 'none'){
+    toks <- toks.base
+  }
+  # -> transfers "toks"
+  print(s)
+  print(Sys.time() - start.time)
+  
+  ## Step (2)
+  for(st in stops.v){
+    if(st == 'def'){
+      toks.st <- quanteda::tokens_remove(toks, sw.def) 
+    }
+    if(st == 'ext'){
+      toks.st <- quanteda::tokens_remove(toks, sw.ext) 
+    }
+    print(st)
+    print(Sys.time() - start.time)
+    # -> transfers "toks.st"
+    
+    ## Step (3)
+    for(n in ngrams.v){
+      if(n == 'bi'){
+        phrases.bi <- parallelizeTask(quanteda::textstat_collocations, x = toks.st, min_count = 50, method = 'lambda', size = 2, tolower = F)
+        toks.n <- parallelizeTask(quanteda::tokens_compound, x = toks.st, pattern = phrases.bi[1:ngrams.max], concatenator = "_", join = F) 
+      }
+      if(n == 'tri'){
+        phrases.tri <- parallelizeTask(quanteda::textstat_collocations, x = toks.st, min_count = 50, method = 'lambda', size = 3, tolower = F)
+        phrases.both <- rbind(phrases.bi, phrases.tri)
+        phrases.both <- phrases.both[order(phrases.both$lambda, decreasing = T),]
+        toks.n <- parallelizeTask(quanteda::tokens_compound, x = toks.st, pattern = phrases.both[1:ngrams.max], concatenator = "_", join = F) 
+      }
+      # save final outcome "toks.n"
+      f <- paste('PrepStep', s, st, n, sep = '_')
+      f <- paste('PrepStep/', f, '.Rdata', sep = '') # save in folder 'PrepStep'
+      save(toks.n, file = f)
+      print(f)
+      print(Sys.time() - start.time)
+      gc()
+    }
+  }
+}
+print(Sys.time() - start.time)
+
+
+# Convert to stm
+
+# * Attach meta variables. In our case, 'ThesisYear' contains the covariate used when running the STMs, 'for_stm' contains the raw text. The columns are supposed to be attached to a data.frame named `df`
+meta.names <- c('ThesisYear', 'ProQuest Thesis ID', 'for_stm') 
+# * Load files saved in previous loop
+PrepStep.list <- list.files('') 
+length(PrepStep.list) # should be 12
+
+start <- Sys.time()
+for(f in PrepStep.list){
+  f.save <- gsub('PrepStep', 'STMProc', f)
+  
+  # load each "PrepStep" file
+  load(file = paste('PrepStep/',f, sep = '')) # toks.n
+  # attach meta information
+  for(i in meta.names){
+    docvars(toks.n, i) <- df[,i]
+  }
+  dtm <- dfm(toks.n) # document-term. Should contain all meta-vars needed for the stm
+  dtm <- quanteda::dfm_trim(dtm, min_docfreq = 1) # can change min_docfreq, of course 
+  dtm.stm <- quanteda::convert(dtm, to = "stm", omit_empty = T)
+  save(dtm.stm, file = paste('STM_Proc/', f.save, sep = '' )) # save in different folder, here called 'STM_Proc'
+  
+  print(f.save)
+  print(Sys.time() - start) 
+  gc()
+}
+
+# Run STMs
+
+# * Load files
+STM.list <- list.files('STM_Proc')
+length(STM.list) # should be 12
+
+# * Run as cluster
+ncores <- 12 # on server
+cl <- makeCluster(ncores)
+registerDoParallel(cl)
+
+# * Mirror settings from ["Paradigm Wars" paper](https://journals.sagepub.com/doi/pdf/10.3102/0002831219860511)
+em <- 0.00005 
+seed <- 4425112
+
+# * Start loop for range of **K**
+start.time0 <- Sys.time()
+for(f in STM.list){
+  load(file = paste('STM_Proc/', f, sep = '')) # dtm.stm
+  f.save <- gsub('STMProc', 'Model', f)
+  start.time1 <- Sys.time()
+  k.cand <- seq(10, 100, 10)
+  cat('Start: ', f.save)
+  for(k in k.cand){
+    start.time2 <- Sys.time()
+    model <- stm(documents = dtm.stm$documents,
+                 vocab = dtm.stm$vocab,
+                 data = dtm.stm$meta,
+                 K = k, 
+                 prevalence =~ ThesisYear, # see above for meta-information
+                 max.em.its = 75, 
+                 emtol = em, 
+                 seed = seed,
+                 verbose = F, 
+                 init.type = "Spectral") 
+    # save data
+    save(model, file = paste('STM_Model/',  f.save, '_', k,'.Rdata', sep = '') )
+    print(k)
+    print(Sys.time() - start.time2)
+    gc()
+  }
+  print(f)
+  print(Sys.time() - start.time1)
+}
+
+print(Sys.time() - start.time0)
+stopCluster(cl)
+
