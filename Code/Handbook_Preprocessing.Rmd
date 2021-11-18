@@ -1,15 +1,23 @@
-# Preprocessing
+---
+title: "Handbook_Preprocessing"
+output: 
+  html_document:
+    toc: true
+    number_sections: true
+---
 
-# The script entails three major functions, which can be used for all kind of cases: 
-# * **1)** general preprocessing applied to all texts (e.g., fix whitespaces, remove numbers etc)
-# * **2)** specific preprocessing steps as discussed in the chapter: 
-#   * Stems vs. Lemmas vs. No reduction
-#   * Default vs. Extended stopwords
-#   * Bigrams vs. Trigrams
-# * **3)** create input that can be read by the STM-package (this step could also be included in (2)).
-# We provide an example for each function. The example  resembles the code we used for this contribution. However, we cannot provide the textual data from ProQuest.
+The script entails three major functions, which can be used for all kind of cases: 
+
+* **1)** general preprocessing applied to all texts (e.g., fix whitespaces, remove numbers etc)
+* **2)** specific preprocessing steps as discussed in the chapter: 
+   * Stems vs. Lemmas vs. No reduction
+   * Default vs. Extended stopwords
+   * Bigrams vs. Trigrams
+* **3)** create input that can be read by the STM-package (this step could also be included in (2)).
+We provide an example for each function. The example  resembles the code we used for this contribution. However, we cannot provide the textual data from ProQuest.
 
 # General preprocessing
+```{r, eval = FALSE, eval = FALSE}
 prepro_general <- function(input.chars){
   input.chars <- trimws(input.chars,
                         which = "both")
@@ -24,20 +32,22 @@ prepro_general <- function(input.chars){
   input.chars <- sapply(toks, paste, collapse = ' ')
   return(input.chars)
 }
+```
 
-# * The input comprises the title and abstract of each thesis. `ThesisTitle` and `ThesisAbstract` represent those specific columns and are combined to `for_stm`. However, the function `prepro_general` can work with any vector of characters. 
-# * For instance, the following line should produce the main input df
+* The input comprises the title and abstract of each thesis. `ThesisTitle` and `ThesisAbstract` represent those specific columns and are combined to `for_stm`. However, the function `prepro_general` can work with any vector of characters. 
+* For instance, the following line produces the main input `df` for our paper.
 
+```{r, eval = FALSE}
 input <- paste(df$ThesisTitle,
                      df$ThesisAbstract)
 df$for_stm <- prepro_general(input.chars = input)
-
+```
 
 # Specific preprocessing
 
-# * The major challenge of the various preprocessing steps was to combine them. Therefore, the function is rather trivial, but the loop shows how we combined the different steps. 
-
-# * small function to do parallel
+* The major challenge of the various preprocessing steps was to combine them. Therefore, the function is rather trivial, but the loop shows how we combined the different steps. 
+* Small function to do parallel
+```{r, eval = FALSE}
 library(doParallel)
 parallelizeTask <- function(task,...) {
   # Calculate the number of cores
@@ -52,8 +62,10 @@ parallelizeTask <- function(task,...) {
   stopCluster(cl)
   r
 }
+```
 
-# * Function for specific preprocessing
+* Function for specific preprocessing
+```{r, eval = FALSE}
 prepro_specific <- function(stem.v, stops.v, ngrams.v, input.chars){
   toks.base <- quanteda::tokens(input.chars) 
   if(stem.v == 'port'){
@@ -87,16 +99,18 @@ prepro_specific <- function(stem.v, stops.v, ngrams.v, input.chars){
       toks.n <- parallelizeTask(quanteda::tokens_compound, x = toks.st, pattern = phrases.both[1:ngrams.max], concatenator = "_", join = F) 
     }
 }
+```
 
-### Loop over specific preprocessing steps
+## Loop over specific preprocessing steps
 
 ### Settings 
 
-#### Default stopwords
+```{r, eval = FALSE}
+##### Default stopwords
 sw.def <- quanteda::stopwords("en") 
 sw.def <- sw.def[- grep("'", sw.def)] # drops all words with ' (eg "i'm", "you're", etc) # N = 125
 
-#### Extended stopwords
+##### Extended stopwords
 months <- c("january","february","march","april",
             "may","june","july","august","september",
             "october","november","december", "month",
@@ -112,17 +126,24 @@ sw.ext <- c(sw.def, months, numerals, misc) # length(unique(sw.ext)) # N = 212
 
 #### Maximum number of ngrams 
 ngrams.max <- 7000 # assuming 5% of number of documents; still, arbitrary choice
+```
 
+We test three different settings and write each to a specific file. Those files are then used to run the STMs (see step 3). 
 
-# We test three different settings and write each to a specific file. Those files are then used to run the STMs (see step 3). 
-
-# * Stems vs. Lemmas vs. No reduction
+* Stems vs. Lemmas vs. No reduction
+```{r, eval = FALSE}
 stem.v <- c('port', 'lemm', 'none') # (1)
-# * Default vs. Extended stopwords
+```
+* Default vs. Extended stopwords
+```{r, eval = FALSE}
 stops.v <- c('def', 'ext') # (2)
-# * Bigrams vs. Trigrams
+```
+* Bigrams vs. Trigrams
+```{r, eval = FALSE}
 ngrams.v <- c('bi', 'tri') # (3)
+```
 
+```{r, eval = FALSE}
 toks.base <- quanteda::tokens(df$for_stm) # cf. "General preprocessing" above
 
 for(s in stem.v){
@@ -179,26 +200,31 @@ for(s in stem.v){
     }
   }
 }
-
+```
 
 # Convert to `stm`
 
-# * Function to convert `quanteda::toks` into a `stm`-compatible doc-frequency-matrix.
+* Function to convert `quanteda::toks` into a `stm`-compatible doc-frequency-matrix.
+```{r, eval = FALSE}
 stm.toks <- function(toks, min.doc, min.term){
   dtm <- dfm(toks) # document-term. Should contain all meta-vars attached to "toks"
   dtm <- quanteda::dfm_trim(dtm, min_docfreq = min.doc, min.term) 
   dtm.stm <- quanteda::convert(dtm, to = "stm", omit_empty = T)
   return(dtm.stm)
 }
+```
 
 ## Example
-# * Attach meta variables. In our case, 'ThesisYear' contains the covariate used when running the STMs, 'for_stm' contains the raw text. The columns are supposed to be attached to a data.frame named `df`
+* Attach meta variables. In our case, 'ThesisYear' contains the covariate used when running the STMs, 'for_stm' contains the raw text. The columns are supposed to be attached to a data.frame named `df`
 meta.names <- c('ThesisYear', 'ProQuest Thesis ID', 'for_stm') 
-# * Load files saved in previous loop
+* Load files saved in previous loop
+```{r, eval = FALSE}
 PrepStep.list <- list.files('') 
 length(PrepStep.list) # should be 12
+```
 
 ### Loop
+```{r, eval = FALSE}
 start <- Sys.time()
 for(f in PrepStep.list){
   f.save <- gsub('PrepStep', 'STMProc', f)
@@ -216,22 +242,31 @@ for(f in PrepStep.list){
   print(Sys.time() - start) 
   gc()
 }
+```
 
 ### Run STMs
-# * Load files
+
+* Load files
+```{r, eval = FALSE}
 STM.list <- list.files('STM_Proc')
 length(STM.list) # should be 12
+```
 
-# * Run as cluster
+* Run as cluster
+```{r, eval = FALSE}
 ncores <- 12 # on server
 cl <- makeCluster(ncores)
 registerDoParallel(cl)
+```
 
-# * Mirror settings from ["Paradigm Wars" paper](https://journals.sagepub.com/doi/pdf/10.3102/0002831219860511)
+* Mirror settings from ["Paradigm Wars" paper](https://journals.sagepub.com/doi/pdf/10.3102/0002831219860511)
+```{r, eval = FALSE}
 em <- 0.00005 
 seed <- 4425112
+```
 
-# * Start loop for range of **K**
+* Start loop for range of **K**
+```{r, eval = FALSE}
 start.time0 <- Sys.time()
 for(f in STM.list){
   load(file = paste('STM_Proc/', f, sep = '')) # dtm.stm
@@ -263,3 +298,4 @@ for(f in STM.list){
 
 print(Sys.time() - start.time0)
 stopCluster(cl)
+```

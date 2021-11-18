@@ -4,7 +4,7 @@ This repository contains code and data to reproduce our contribution to the *Han
 
 If you use any of the code or ideas presented here, please cite the paper as follows:
 
-* Heiberger, Raphael H., & Sebastian Munoz-Najar Galvez. (2021). Text mining and topic modeling. In Uwe Engel,Anabel Quan-Haase, Sunny Xun Liu, Lars Lyberg (Eds.), *Handbook of Computational Social Science*. London: Routledge.  
+* Heiberger, Raphael H., & Sebastian Munoz-Najar Galvez. (2021). Text mining and topic modeling. In Uwe Engel, Anabel Quan-Haase, Sunny Xun Liu, Lars Lyberg (Eds.), *Handbook of Computational Social Science*. London: Routledge.
 
 
 ## Short description
@@ -13,7 +13,7 @@ Working with text poses important conceptual and methodological challenges. Topi
 ## Code
 Due to legal reasons, the repository cannot include the original text data from ProQuest. The raw text data is available under this [link](https://www.proquest.com/).
 
-Nevertheless, we provide the code necessary to reconstruct everything we have done, and, apply it to own use cases. The code contains 2 scripts:
+Nevertheless, we provide the code necessary to reconstruct everything we have done, and, apply it to one's own cases. The code contains 2 scripts:
 
 * `Handbook_Preprocessing.R`: applies 12 different preprocessing steps as discussed in the chapter and shows how to run the respective STMs
-* `Handbook_Analyze_K.R`: derives the figures presented in the chapter
+* `Handbook_Analyze_K.R`: concerns the different analyses on the choice of K and the quality of topic models as discussed in the contribution
