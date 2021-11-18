@@ -172,14 +172,14 @@ pre code {
 <li><a href="#general-preprocessing"><span class="toc-section-number">1</span> General preprocessing</a></li>
 <li><a href="#specific-preprocessing"><span class="toc-section-number">2</span> Specific preprocessing</a>
 <ul>
-<li><a href="#loop-over-specific-preprocessing-steps"><span class="toc-section-number">2.1</span> Loop over specific preprocessing steps</a>
+<li><a href="#example"><span class="toc-section-number">2.1</span> Example</a>
 <ul>
 <li><a href="#settings"><span class="toc-section-number">2.1.1</span> Settings</a></li>
 </ul></li>
 </ul></li>
 <li><a href="#convert-to-stm"><span class="toc-section-number">3</span> Convert to <code>stm</code></a>
 <ul>
-<li><a href="#example"><span class="toc-section-number">3.1</span> Example</a>
+<li><a href="#example-1"><span class="toc-section-number">3.1</span> Example</a>
 <ul>
 <li><a href="#loop"><span class="toc-section-number">3.1.1</span> Loop</a></li>
 <li><a href="#run-stms"><span class="toc-section-number">3.1.2</span> Run STMs</a></li>
@@ -246,41 +246,38 @@ parallelizeTask &lt;- function(task,...) {
 <ul>
 <li>Function for specific preprocessing</li>
 </ul>
-<pre class="r"><code>prepro_specific &lt;- function(stem.v, stops.v, ngrams.v, input.chars){
+<pre class="r"><code>prepro_specific &lt;- function(stem.v, stops.v, ngrams.v, ngrams.max, input.chars){
   toks.base &lt;- quanteda::tokens(input.chars) 
   if(stem.v == &#39;port&#39;){
     toks &lt;- quanteda::tokens_wordstem(toks.base) # Porter stemmer
-    sw.def &lt;- textstem::stem_strings(sw.def)
-    sw.ext &lt;- textstem::stem_strings(sw.ext)
   }
   if(stem.v == &#39;lemm&#39;){
     toks &lt;- lapply(toks.base, textstem::lemmatize_words) # Lemmatize
     toks &lt;- as.tokens(toks)
-    sw.def &lt;- textstem::lemmatize_strings(sw.def)
-    sw.ext &lt;- textstem::lemmatize_words(sw.ext)
   }
   if(stem.v == &#39;none&#39;){
     toks &lt;- toks.base
   }
   if(stops.v == &#39;def&#39;){
-    toks.st &lt;- quanteda::tokens_remove(toks, sw.def) 
+    toks &lt;- quanteda::tokens_remove(toks.base, sw.def) 
   }
   if(stops.v == &#39;ext&#39;){
-    toks.st &lt;- quanteda::tokens_remove(toks, sw.ext) 
+    toks &lt;- quanteda::tokens_remove(toks.base, sw.ext) 
   }
   if(ngrams.v == &#39;bi&#39;){
-      phrases.bi &lt;- parallelizeTask(quanteda::textstat_collocations, x = toks.st, min_count = 50, method = &#39;lambda&#39;, size = 2, tolower = F)
-      toks.n &lt;- parallelizeTask(quanteda::tokens_compound, x = toks.st, pattern = phrases.bi[1:ngrams.max], concatenator = &quot;_&quot;, join = F) 
+      phrases.bi &lt;- parallelizeTask(quanteda::textstat_collocations, x = toks.base, min_count = 50, method = &#39;lambda&#39;, size = 2, tolower = F)
+      toks &lt;- parallelizeTask(quanteda::tokens_compound, x = toks.base, pattern = phrases.bi[1:ngrams.max], concatenator = &quot;_&quot;, join = F) 
     }
     if(ngrams.v == &#39;tri&#39;){
-      phrases.tri &lt;- parallelizeTask(quanteda::textstat_collocations, x = toks.st, min_count = 50, method = &#39;lambda&#39;, size = 3, tolower = F)
+      phrases.tri &lt;- parallelizeTask(quanteda::textstat_collocations, x = toks.base, min_count = 50, method = &#39;lambda&#39;, size = 3, tolower = F)
       phrases.both &lt;- rbind(phrases.bi, phrases.tri)
       phrases.both &lt;- phrases.both[order(phrases.both$lambda, decreasing = T),]
-      toks.n &lt;- parallelizeTask(quanteda::tokens_compound, x = toks.st, pattern = phrases.both[1:ngrams.max], concatenator = &quot;_&quot;, join = F) 
+      toks &lt;- parallelizeTask(quanteda::tokens_compound, x = toks.base, pattern = phrases.both[1:ngrams.max], concatenator = &quot;_&quot;, join = F) 
     }
+  return(toks)
 }</code></pre>
-<div id="loop-over-specific-preprocessing-steps" class="section level2" number="2.1">
-<h2><span class="header-section-number">2.1</span> Loop over specific preprocessing steps</h2>
+<div id="example" class="section level2" number="2.1">
+<h2><span class="header-section-number">2.1</span> Example</h2>
 <div id="settings" class="section level3" number="2.1.1">
 <h3><span class="header-section-number">2.1.1</span> Settings</h3>
 <pre class="r"><code>##### Default stopwords
@@ -386,7 +383,7 @@ for(s in stem.v){
   dtm.stm &lt;- quanteda::convert(dtm, to = &quot;stm&quot;, omit_empty = T)
   return(dtm.stm)
 }</code></pre>
-<div id="example" class="section level2" number="3.1">
+<div id="example-1" class="section level2" number="3.1">
 <h2><span class="header-section-number">3.1</span> Example</h2>
 <ul>
 <li>Attach meta variables. In our case, ‘ThesisYear’ contains the covariate used when running the STMs, ‘for_stm’ contains the raw text. The columns are supposed to be attached to a data.frame named <code>df</code> meta.names &lt;- c(‘ThesisYear’, ‘ProQuest Thesis ID’, ‘for_stm’)</li>

@@ -54,38 +54,35 @@ parallelizeTask <- function(task,...) {
 }
 
 # * Function for specific preprocessing
-prepro_specific <- function(stem.v, stops.v, ngrams.v, input.chars){
+prepro_specific <- function(stem.v, stops.v, ngrams.v, ngrams.max, input.chars){
   toks.base <- quanteda::tokens(input.chars) 
   if(stem.v == 'port'){
     toks <- quanteda::tokens_wordstem(toks.base) # Porter stemmer
-    sw.def <- textstem::stem_strings(sw.def)
-    sw.ext <- textstem::stem_strings(sw.ext)
   }
   if(stem.v == 'lemm'){
     toks <- lapply(toks.base, textstem::lemmatize_words) # Lemmatize
     toks <- as.tokens(toks)
-    sw.def <- textstem::lemmatize_strings(sw.def)
-    sw.ext <- textstem::lemmatize_words(sw.ext)
   }
   if(stem.v == 'none'){
     toks <- toks.base
   }
   if(stops.v == 'def'){
-    toks.st <- quanteda::tokens_remove(toks, sw.def) 
+    toks <- quanteda::tokens_remove(toks.base, sw.def) 
   }
   if(stops.v == 'ext'){
-    toks.st <- quanteda::tokens_remove(toks, sw.ext) 
+    toks <- quanteda::tokens_remove(toks.base, sw.ext) 
   }
   if(ngrams.v == 'bi'){
-      phrases.bi <- parallelizeTask(quanteda::textstat_collocations, x = toks.st, min_count = 50, method = 'lambda', size = 2, tolower = F)
-      toks.n <- parallelizeTask(quanteda::tokens_compound, x = toks.st, pattern = phrases.bi[1:ngrams.max], concatenator = "_", join = F) 
-    }
-    if(ngrams.v == 'tri'){
-      phrases.tri <- parallelizeTask(quanteda::textstat_collocations, x = toks.st, min_count = 50, method = 'lambda', size = 3, tolower = F)
-      phrases.both <- rbind(phrases.bi, phrases.tri)
-      phrases.both <- phrases.both[order(phrases.both$lambda, decreasing = T),]
-      toks.n <- parallelizeTask(quanteda::tokens_compound, x = toks.st, pattern = phrases.both[1:ngrams.max], concatenator = "_", join = F) 
-    }
+    phrases.bi <- parallelizeTask(quanteda::textstat_collocations, x = toks.base, min_count = 50, method = 'lambda', size = 2, tolower = F)
+    toks <- parallelizeTask(quanteda::tokens_compound, x = toks.base, pattern = phrases.bi[1:ngrams.max], concatenator = "_", join = F) 
+  }
+  if(ngrams.v == 'tri'){
+    phrases.tri <- parallelizeTask(quanteda::textstat_collocations, x = toks.base, min_count = 50, method = 'lambda', size = 3, tolower = F)
+    phrases.both <- rbind(phrases.bi, phrases.tri)
+    phrases.both <- phrases.both[order(phrases.both$lambda, decreasing = T),]
+    toks <- parallelizeTask(quanteda::tokens_compound, x = toks.base, pattern = phrases.both[1:ngrams.max], concatenator = "_", join = F) 
+  }
+  return(toks)
 }
 
 ### Loop over specific preprocessing steps
